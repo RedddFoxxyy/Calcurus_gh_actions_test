@@ -54,7 +54,7 @@ jobs:
         run: cp ${{ env.BINARY_PATH }} build/my_binary${{ matrix.os == 'windows-latest' && '.exe' || '' }}
       - name: Create .deb and .rpm with nfpm (Linux)
         if: matrix.os == 'ubuntu-latest'
-        uses: go-nfpm/nfpm@v2
+        uses: skynet-core/nfpm@v2.3
         with:
           config: nfpm.yaml
           formats: deb,rpm
