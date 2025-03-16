@@ -22,15 +22,19 @@ jobs:
         with:
           toolchain: stable
 
-      # Step 3: Install Trunk (skip if already installed in your project environment)
+      # Step 3: Install the wasm32 target
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      # Step 4: Install Trunk (skip if already installed in your project environment)
       - name: Install Trunk
         run: cargo install trunk
 
-      # Step 4: Build your project in release mode
+      # Step 5: Build your project in release mode
       - name: Build with Trunk
         run: trunk build --release
 
-      # Step 5: Deploy the contents of the dist folder to the gh-pages branch
+      # Step 6: Deploy the contents of the dist folder to the gh-pages branch
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
