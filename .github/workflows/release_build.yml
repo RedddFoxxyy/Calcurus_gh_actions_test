@@ -1,0 +1,84 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - v[0-9]+.*
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          # (optional) Path to changelog.
+          # changelog: CHANGELOG.md
+          # (required) GitHub token for creating GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set binary path
+        run: echo "BINARY_PATH=target/${{ matrix.target }}/release/my_binary${{ matrix.os == 'windows-latest' && '.exe' || '' }}" >> $GITHUB_ENV
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
+          bin: Calcurus
+          # (optional) Target triple.
+          target: ${{ matrix.target }}
+          # (optional) Distribute `.tar.gz` for Unix-like platforms.
+          tar: unix
+          # (optional) Distribute `.zip` for Windows.
+          zip: windows
+          # (required) GitHub token for uploading assets.
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create build directory
+        run: mkdir build
+      - name: Copy binary to build directory
+        run: cp ${{ env.BINARY_PATH }} build/my_binary${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+      - name: Create .deb and .rpm with nfpm (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: go-nfpm/nfpm@v2
+        with:
+          config: nfpm.yaml
+          formats: deb,rpm
+      - name: Create AppImage (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: appimagecrafters/appimage-builder-action@v1
+        with:
+          recipe: AppImageBuilder.yml
+      - name: Upload Linux packages
+        if: matrix.os == 'ubuntu-latest'
+        run: gh release upload ${{ github.ref_name }} *.deb *.rpm *.AppImage
+      - name: Install WiX and NSIS (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install wixtoolset -y
+          choco install nsis -y
+      - name: Build MSI installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          candle product.wxs
+          light product.wixobj -o product.msi
+      - name: Build NSIS installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: makensis installer.nsi
+      - name: Upload Windows packages
+        if: matrix.os == 'windows-latest'
+        run: gh release upload ${{ github.ref_name }} product.msi installer.exe
